@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kusudama 3D Gallery</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <header class="overlay-ui">
+        <h1>Kusudama Universe</h1>
+        <p>Drag to rotate. Click a sphere to explore.</p>
+    </header>
+
+    <div id="container3d"></div>
+
+    <div id="lightbox" class="lightbox">
+        <span class="close">&times;</span>
+        <button class="nav-btn prev" id="prevBtn">&#10094;</button>
+        <div class="lightbox-container">
+            <img class="lightbox-content" id="lightbox-img">
+            <div id="caption"></div>
+        </div>
+        <button class="nav-btn next" id="nextBtn">&#10095;</button>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>
