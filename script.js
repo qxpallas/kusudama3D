@@ -87,6 +87,31 @@ window.addEventListener('mousemove', (e) => {
     previousMouseY = e.clientY;
 });
 
+window.addEventListener('click', (event) => {
+    // 1. Calculate mouse position in normalized device coordinates (-1 to +1)
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // 2. Update the raycaster with the camera and mouse position
+    raycaster.setFromCamera(mouse, camera);
+
+    // 3. Calculate objects intersecting the picking ray
+    // 'true' checks all children (the faces we added to the mesh)
+    const intersects = raycaster.intersectObject(mesh, true);
+
+    if (intersects.length > 0) {
+        // Find the index of the face that was hit
+        const faceIndex = intersects[0].faceIndex;
+        
+        // Since each image is on 2 faces (20 faces / 10 images), 
+        // we map the faceIndex back to our 10-image array
+        const imageIndex = Math.floor(faceIndex / 2); 
+        
+        console.log("Clicked face:", faceIndex, "Showing image:", imageIndex);
+        openLightbox(imageIndex);
+    }
+});
+
 function openLightbox(index) {
     const lb = document.getElementById('lightbox');
     const lbImg = document.getElementById('lightbox-img');
