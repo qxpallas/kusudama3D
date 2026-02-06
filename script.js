@@ -7,78 +7,91 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 container.appendChild(renderer.domElement);
 
-// Create the Icosahedron Geometry
-const geometry = new THREE.IcosahedronGeometry(10, 0); // Radius 10
-const material = new THREE.MeshBasicMaterial({ color: 0xcccccc, wireframe: true, transparent: true, opacity: 0.2 });
-const mesh = new THREE.Mesh(geometry, material);
-scene.add(mesh);
-
 // Your 10 Images
-const textureLoader = new THREE.TextureLoader();
 const kusudamaImages = [
     'kusudama1.jpeg', 'kusudama2.jpeg', 'kusudama3.jpeg', 'kusudama4.jpeg', 'kusudama5.jpeg',
     'kusudama6.jpeg', 'kusudama7.jpeg', 'kusudama8.jpeg', 'kusudama9.jpeg', 'kusudama10.jpeg'
 ];
 
-const spheres = [];
-const vertices = geometry.attributes.position;
-const v3 = new THREE.Vector3();
+const textureLoader = new THREE.TextureLoader();
 
-// Place a sphere with your photo at each vertex
-for (let i = 0; i < kusudamaImages.length; i++) {
-    v3.fromBufferAttribute(vertices, i);
-    const tex = textureLoader.load(kusudamaImages[i]);
-    const sphereGeom = new THREE.SphereGeometry(1.5, 32, 32);
-    const sphereMat = new THREE.MeshBasicMaterial({ map: tex });
-    const sphere = new THREE.Mesh(sphereGeom, sphereMat);
-    
-    sphere.position.copy(v3);
-    sphere.userData = { index: i, name: `Kusudama ${i+1}` }; // Store info for clicking
-    mesh.add(sphere);
-    spheres.push(sphere);
+// Create an array of 20 materials (one for each face)
+// We loop through your 10 images twice to fill all 20 faces
+const materials = [];
+for (let i = 0; i < 20; i++) {
+    const imageIndex = i % kusudamaImages.length;
+    const texture = textureLoader.load(kusudamaImages[imageIndex]);
+    materials.push(new THREE.MeshBasicMaterial({ 
+        map: texture, 
+        side: THREE.DoubleSide 
+    }));
 }
+
+// Create Icosahedron
+const geometry = new THREE.IcosahedronGeometry(10, 0);
+
+// Assign a unique material index to each face (0 through 19)
+geometry.clearGroups();
+for (let i = 0; i < 20; i++) {
+    geometry.addGroup(i * 3, 3, i);
+}
+
+const mesh = new THREE.Mesh(geometry, materials);
+scene.add(mesh);
 
 camera.position.z = 25;
 
-// Rotation Logic
+// Rotation & Interaction Logic
 let isDragging = false;
-let mouse = new THREE.Vector2();
-let raycaster = new THREE.Raycaster();
+let previousMouseX = 0;
+let previousMouseY = 0;
 
 function animate() {
     requestAnimationFrame(animate);
     if (!isDragging) {
-        mesh.rotation.y += 0.005; // Slow auto-spin
+        mesh.rotation.y += 0.005;
+        mesh.rotation.x += 0.002;
     }
     renderer.render(scene, camera);
 }
 animate();
 
-// Click detection
+// Raycaster for clicking faces
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
 window.addEventListener('click', (event) => {
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    
+
     raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(spheres);
-    
+    const intersects = raycaster.intersectObject(mesh);
+
     if (intersects.length > 0) {
-        const clickedObj = intersects[0].object;
-        openLightbox(clickedObj.userData.index);
+        // The faceIndex tells us which face was clicked
+        const faceIndex = intersects[0].faceIndex;
+        const imageIndex = faceIndex % kusudamaImages.length;
+        openLightbox(imageIndex);
     }
 });
 
-// Resize handler
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+// Drag to Rotate
+window.addEventListener('mousedown', () => isDragging = true);
+window.addEventListener('mouseup', () => isDragging = false);
+window.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+        mesh.rotation.y += (e.clientX - previousMouseX) * 0.01;
+        mesh.rotation.x += (e.clientY - previousMouseY) * 0.01;
+    }
+    previousMouseX = e.clientX;
+    previousMouseY = e.clientY;
 });
 
-// Integration with your existing Lightbox
 function openLightbox(index) {
     const lb = document.getElementById('lightbox');
     const lbImg = document.getElementById('lightbox-img');
+    const caption = document.getElementById('caption');
     lbImg.src = kusudamaImages[index];
+    caption.innerText = `Kusudama Design ${index + 1}`;
     lb.style.display = 'flex';
 }
