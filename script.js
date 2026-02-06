@@ -4,7 +4,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // High-def for mobile
+renderer.setPixelRatio(window.devicePixelRatio);
 document.getElementById('container3d').appendChild(renderer.domElement);
 
 const kusudamaImages = [
@@ -16,59 +16,66 @@ const kusudamaImages = [
 const group = new THREE.Group();
 scene.add(group);
 
-// 1. Create the Dodecahedron (12 faces)
+// 1. Create the Dodecahedron
 const geometry = new THREE.DodecahedronGeometry(10, 0);
 const textureLoader = new THREE.TextureLoader();
 const tiles = [];
 
-// 2. Math to find the center of each of the 12 faces
-const vertices = geometry.attributes.position.array;
-const faceCenters = [];
+// 2. Exact Face Distribution Logic
+// A dodecahedron has 12 faces. In Three.js, these are made of 36 triangles.
+// We need to find the center of each group of 3 triangles.
+const posAttribute = geometry.getAttribute('position');
+const faceCount = 12;
 
-// A dodecahedron has 12 faces; each face is a pentagon (5 vertices)
-// There are 60 indices (12 faces * 3 triangles/face * 3 vertices)
-// But we can simply use the face normals to place our images
-for (let i = 0; i < 12; i++) {
-    const material = new THREE.MeshBasicMaterial({ 
-        map: textureLoader.load(kusudamaImages[i]),
-        side: THREE.DoubleSide
-    });
+for (let i = 0; i < faceCount; i++) {
+    // Each pentagonal face is represented by 3 triangles (9 vertices)
+    const startIndex = i * 9;
+    const v1 = new THREE.Vector3().fromBufferAttribute(posAttribute, startIndex);
+    const v2 = new THREE.Vector3().fromBufferAttribute(posAttribute, startIndex + 1);
+    const v3 = new THREE.Vector3().fromBufferAttribute(posAttribute, startIndex + 2);
 
-    // Create a circular "disc" for each face to avoid triangular stretching
-    const tileGeom = new THREE.CircleGeometry(4.5, 32); 
-    const tile = new THREE.Mesh(tileGeom, material);
+    // Find the center point of the face
+    const center = new THREE.Vector3()
+        .add(v1).add(v2).add(v3).divideScalar(3);
 
-    // Position the tile based on the dodecahedron's face normals
-    const normal = new THREE.Vector3();
-    const plane = new THREE.Plane().setFromCoplanarPoints(
-        new THREE.Vector3(vertices[i*15], vertices[i*15+1], vertices[i*15+2]),
-        new THREE.Vector3(vertices[i*15+3], vertices[i*15+4], vertices[i*15+5]),
-        new THREE.Vector3(vertices[i*15+6], vertices[i*15+7], vertices[i*15+8])
-    );
-    
-    tile.position.copy(plane.normal).multiplyScalar(10.1); // Float slightly above
-    tile.lookAt(plane.normal.multiplyScalar(20)); // Face outward
+    // Find the vector pointing out from the center (the Normal)
+    const normal = center.clone().normalize();
+
+    // Create the Tile (Square/Circle works best to avoid distortion)
+    const tex = textureLoader.load(kusudamaImages[i]);
+    const tileGeom = new THREE.CircleGeometry(4.2, 32); 
+    const tileMat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
+    const tile = new THREE.Mesh(tileGeom, tileMat);
+
+    // Position and Orient
+    tile.position.copy(normal).multiplyScalar(10.05); // Sit slightly above the surface
+    tile.lookAt(normal.multiplyScalar(20)); // Point the face of the photo outwards
     
     tile.userData = { index: i };
     group.add(tile);
     tiles.push(tile);
 }
 
-// Add a faint wireframe for structure
-const wireMat = new THREE.MeshBasicMaterial({ color: 0x000000, wireframe: true, transparent: true, opacity: 0.05 });
-const body = new THREE.Mesh(geometry, wireMat);
-group.add(body);
+// Faint wireframe for geometric feel
+const wireframe = new THREE.Mesh(
+    geometry,
+    new THREE.MeshBasicMaterial({ color: 0x000000, wireframe: true, transparent: true, opacity: 0.1 })
+);
+group.add(wireframe);
 
 camera.position.z = 30;
 
-// 3. Mobile-Optimized Interaction (Pointer Events)
+// 3. Interaction Logic (Same as before, ensures mobile and click work)
 let isDragging = false;
-let hasMoved = false;
+let moveStarted = false;
 let startX, startY;
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
 
 window.addEventListener('pointerdown', (e) => {
     isDragging = true;
-    hasMoved = false;
+    moveStarted = false;
     startX = e.clientX;
     startY = e.clientY;
 });
@@ -77,8 +84,7 @@ window.addEventListener('pointermove', (e) => {
     if (!isDragging) return;
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
-    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasMoved = true;
-
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) moveStarted = true;
     group.rotation.y += dx * 0.005;
     group.rotation.x += dy * 0.005;
     startX = e.clientX;
@@ -87,27 +93,17 @@ window.addEventListener('pointermove', (e) => {
 
 window.addEventListener('pointerup', (e) => {
     isDragging = false;
-    if (hasMoved) return; // Ignore clicks if the user was spinning
-
-    const mouse = new THREE.Vector2(
-        (e.clientX / window.innerWidth) * 2 - 1,
-        -(e.clientY / window.innerHeight) * 2 + 1
-    );
-
-    const raycaster = new THREE.Raycaster();
+    if (moveStarted) return;
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(tiles);
-
-    if (intersects.length > 0) {
-        openLightbox(intersects[0].object.userData.index);
-    }
+    if (intersects.length > 0) openLightbox(intersects[0].object.userData.index);
 });
 
 function animate() {
     requestAnimationFrame(animate);
-    if (!isDragging) {
-        group.rotation.y += 0.002;
-    }
+    if (!isDragging) group.rotation.y += 0.003;
     renderer.render(scene, camera);
 }
 animate();
