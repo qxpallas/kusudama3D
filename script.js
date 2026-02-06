@@ -8,9 +8,9 @@ renderer.setPixelRatio(window.devicePixelRatio); // Sharpness for mobile
 document.getElementById('container3d').appendChild(renderer.domElement);
 
 const kusudamaImages = [
-    'kusudama1.jpg', 'kusudama2.jpg', 'kusudama3.jpg', 'kusudama4.jpg', 
-    'kusudama5.jpg', 'kusudama6.jpg', 'kusudama7.jpg', 'kusudama8.jpg', 
-    'kusudama9.jpg', 'kusudama10.jpg'
+    'kusudama1.jpeg', 'kusudama2.jpeg', 'kusudama3.jpeg', 'kusudama4.jpeg', 
+    'kusudama5.jpeg', 'kusudama6.jpeg', 'kusudama7.jpeg', 'kusudama8.jpeg', 
+    'kusudama9.jpeg', 'kusudama10.jpeg'
 ];
 
 const group = new THREE.Group();
