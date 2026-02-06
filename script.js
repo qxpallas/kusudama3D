@@ -10,14 +10,14 @@ document.getElementById('container3d').appendChild(renderer.domElement);
 const kusudamaImages = [
     'kusudama1.jpeg', 'kusudama2.jpeg', 'kusudama3.jpeg', 'kusudama4.jpeg', 
     'kusudama5.jpeg', 'kusudama6.jpeg', 'kusudama7.jpeg', 'kusudama8.jpeg', 
-    'kusudama9.jpeg', 'kusudama10.jpeg'
+    'kusudama9.jpeg', 'kusudama10.jpeg', 'kusudama11.jpeg', 'kusudama12.jpeg'
 ];
 
 const group = new THREE.Group();
 scene.add(group);
 
 // 1. Create a wireframe icosahedron as a guide
-const baseGeom = new THREE.IcosahedronGeometry(10, 0);
+const baseGeom = new THREE.IcosahedronGeometry(12, 0);
 const wireframe = new THREE.Mesh(
     baseGeom, 
     new THREE.MeshBasicMaterial({ color: 0x888888, wireframe: true, transparent: true, opacity: 0.1 })
