@@ -86,3 +86,24 @@ header {
 .lightbox {
     z-index: 2000; /* Ensure this is the highest */
 }
+
+canvas {
+    display: block;
+    touch-action: none; /* Prevents the whole webpage from scrolling while you spin the shape */
+}
+
+#container3d {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1;
+}
+
+.overlay-ui {
+    pointer-events: none; /* Allows touches to pass through the text to the 3D shape */
+    position: absolute;
+    width: 100%;
+    z-index: 10;
+}
