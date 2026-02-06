@@ -1,122 +1,103 @@
 import * as THREE from 'three';
 
-const container = document.getElementById('container3d');
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-container.appendChild(renderer.domElement);
+renderer.setPixelRatio(window.devicePixelRatio); // Sharpness for mobile
+document.getElementById('container3d').appendChild(renderer.domElement);
 
-// Your 10 Images
 const kusudamaImages = [
-    'kusudama1.jpeg', 'kusudama2.jpeg', 'kusudama3.jpeg', 'kusudama4.jpeg', 'kusudama5.jpeg',
-    'kusudama6.jpeg', 'kusudama7.jpeg', 'kusudama8.jpeg', 'kusudama9.jpeg', 'kusudama10.jpeg'
+    'kusudama1.jpg', 'kusudama2.jpg', 'kusudama3.jpg', 'kusudama4.jpg', 
+    'kusudama5.jpg', 'kusudama6.jpg', 'kusudama7.jpg', 'kusudama8.jpg', 
+    'kusudama9.jpg', 'kusudama10.jpg'
 ];
 
+const group = new THREE.Group();
+scene.add(group);
+
+// 1. Create a wireframe icosahedron as a guide
+const baseGeom = new THREE.IcosahedronGeometry(10, 0);
+const wireframe = new THREE.Mesh(
+    baseGeom, 
+    new THREE.MeshBasicMaterial({ color: 0x888888, wireframe: true, transparent: true, opacity: 0.1 })
+);
+group.add(wireframe);
+
+// 2. Place Floating Rectangular Tiles on the faces
 const textureLoader = new THREE.TextureLoader();
+const tiles = [];
 
-// Create an array of 20 materials (one for each face)
-// We loop through your 10 images twice to fill all 20 faces
-const materials = [];
-for (let i = 0; i < 20; i++) {
-    const imageIndex = i % kusudamaImages.length;
-    const texture = textureLoader.load(kusudamaImages[imageIndex]);
-    materials.push(new THREE.MeshBasicMaterial({ 
-        map: texture, 
-        side: THREE.DoubleSide 
-    }));
+for (let i = 0; i < kusudamaImages.length; i++) {
+    const tex = textureLoader.load(kusudamaImages[i]);
+    const tileGeom = new THREE.PlaneGeometry(6, 6); // Square tiles won't distort!
+    const tileMat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
+    const tile = new THREE.Mesh(tileGeom, tileMat);
+
+    // Position logic: Put them at the vertex positions but pushed out slightly
+    const vertex = new THREE.Vector3().fromBufferAttribute(baseGeom.attributes.position, i);
+    tile.position.copy(vertex).multiplyScalar(1.1); // Float 10% above the surface
+    tile.lookAt(0, 0, 0); // Make them face the center
+    tile.rotation.y += Math.PI; // Flip to face outward
+    
+    tile.userData = { index: i };
+    group.add(tile);
+    tiles.push(tile);
 }
 
-// Create Icosahedron
-const geometry = new THREE.IcosahedronGeometry(10, 0);
+camera.position.z = 30;
 
-// Assign a unique material index to each face (0 through 19)
-geometry.clearGroups();
-for (let i = 0; i < 20; i++) {
-    geometry.addGroup(i * 3, 3, i);
-}
-
-const mesh = new THREE.Mesh(geometry, materials);
-scene.add(mesh);
-
-camera.position.z = 25;
-
-// Rotation & Interaction Logic
+// 3. Mobile-Optimized Interaction
 let isDragging = false;
-let previousMouseX = 0;
-let previousMouseY = 0;
+let moveStarted = false;
+let startX, startY;
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+// Detect "Tap" vs "Swipe"
+window.addEventListener('pointerdown', (e) => {
+    isDragging = true;
+    moveStarted = false;
+    startX = e.clientX;
+    startY = e.clientY;
+});
+
+window.addEventListener('pointermove', (e) => {
+    if (!isDragging) return;
+    const deltaX = e.clientX - startX;
+    const deltaY = e.clientY - startY;
+    
+    // If moved more than 5px, it's a drag, not a click
+    if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) moveStarted = true;
+
+    group.rotation.y += deltaX * 0.005;
+    group.rotation.x += deltaY * 0.005;
+    
+    startX = e.clientX;
+    startY = e.clientY;
+});
+
+window.addEventListener('pointerup', (e) => {
+    isDragging = false;
+    if (moveStarted) return; // Don't open if they were spinning
+
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(tiles);
+
+    if (intersects.length > 0) {
+        openLightbox(intersects[0].object.userData.index);
+    }
+});
 
 function animate() {
     requestAnimationFrame(animate);
     if (!isDragging) {
-        mesh.rotation.y += 0.005;
-        mesh.rotation.x += 0.002;
+        group.rotation.y += 0.003;
     }
     renderer.render(scene, camera);
 }
 animate();
-
-// Raycaster for clicking faces
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-
-window.addEventListener('click', (event) => {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(mesh);
-
-    if (intersects.length > 0) {
-        // The faceIndex tells us which face was clicked
-        const faceIndex = intersects[0].faceIndex;
-        const imageIndex = faceIndex % kusudamaImages.length;
-        openLightbox(imageIndex);
-    }
-});
-
-// Drag to Rotate
-window.addEventListener('mousedown', () => isDragging = true);
-window.addEventListener('mouseup', () => isDragging = false);
-window.addEventListener('mousemove', (e) => {
-    if (isDragging) {
-        mesh.rotation.y += (e.clientX - previousMouseX) * 0.01;
-        mesh.rotation.x += (e.clientY - previousMouseY) * 0.01;
-    }
-    previousMouseX = e.clientX;
-    previousMouseY = e.clientY;
-});
-
-window.addEventListener('click', (event) => {
-    // 1. Calculate mouse position in normalized device coordinates (-1 to +1)
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    // 2. Update the raycaster with the camera and mouse position
-    raycaster.setFromCamera(mouse, camera);
-
-    // 3. Calculate objects intersecting the picking ray
-    // 'true' checks all children (the faces we added to the mesh)
-    const intersects = raycaster.intersectObject(mesh, true);
-
-    if (intersects.length > 0) {
-        // Find the index of the face that was hit
-        const faceIndex = intersects[0].faceIndex;
-        
-        // Since each image is on 2 faces (20 faces / 10 images), 
-        // we map the faceIndex back to our 10-image array
-        const imageIndex = Math.floor(faceIndex / 2); 
-        
-        console.log("Clicked face:", faceIndex, "Showing image:", imageIndex);
-        openLightbox(imageIndex);
-    }
-});
-
-function openLightbox(index) {
-    const lb = document.getElementById('lightbox');
-    const lbImg = document.getElementById('lightbox-img');
-    const caption = document.getElementById('caption');
-    lbImg.src = kusudamaImages[index];
-    caption.innerText = `Kusudama Design ${index + 1}`;
-    lb.style.display = 'flex';
-}
